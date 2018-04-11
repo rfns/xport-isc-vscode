@@ -1,0 +1,101 @@
+{
+  "name": "xport-cache-vscode",
+  "displayName": "XPort",
+  "description": "An add-on for Port that provides a RESTful API for managing projects using VSCode.",
+  "version": "0.6.0",
+  "publisher": "rubens",
+  "engines": {
+    "vscode": "^1.17.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./extension",
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "XPort configuration",
+      "properties": {
+        "xport.remote.server": {
+          "type": "string",
+          "default": "http://localhost:57772",
+          "description": "The address where the source code API is hosted"
+        },
+        "xport.remote.namespace": {
+          "type": "string",
+          "default": "USER",
+          "description": "The namespace where the source code web application was created"
+        },
+        "xport.remote.includeStack": {
+          "type": "string",
+          "default": false,
+          "description": "Enable this include the stack string from when an operation fails."
+        },
+        "xport.authentication.username": {
+          "type": "string",
+          "default": "_system",
+          "description": "The user name that should be used to authenticate. This user must have %Development function or %Developer role."
+        },
+        "xport.authentication.password": {
+          "type": "string",
+          "default": "SYS",
+          "description": "The user password that should be used to authenticate."
+        },
+        "xport.requestHeaders": {
+          "type": "object",
+          "default": {},
+          "description": "Can be used to extend request headers. Do NOT put Authorization header here as it'll be overwritten by the authentication settings"
+        }
+      }
+    },
+    "commands": [
+      {
+        "category": "XPort",
+        "command": "xport.forceServerSync",
+        "title": "Force server sychronization"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "xport.forceServerSync",
+          "title": "Force server sychronization"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "xport.forceServerSync",
+          "title": "Force server sychronization"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "postinstall": "node ./node_modules/vscode/bin/install",
+    "test": "node ./node_modules/vscode/bin/test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^2.2.42",
+    "@types/node": "^7.0.0",
+    "eslint": "^4.6.1",
+    "mocha": "^3.5.0",
+    "typescript": "^2.5.2",
+    "vscode": "^1.1.5"
+  },
+  "dependencies": {
+    "fs-extra": "^4.0.2",
+    "glob": "^7.1.2",
+    "glob-promise": "^3.3.0",
+    "isomorphic-fetch": "^2.2.1",
+    "lodash.flatten": "^4.4.0",
+    "lodash.uniq": "^4.5.0",
+    "lodash.uniqby": "^4.7.0",
+    "lodash.without": "^4.4.0",
+    "minimatch": "^3.0.4",
+    "p-queue": "^2.4.0",
+    "whatwg-fetch": "^2.0.3"
+  }
+}
