@@ -1,6 +1,6 @@
 > __CAUTION__: This is an experiment and needs to be refined! DO NOT USE this extension in production environments as it might cause data loss. You have been WARNED!
 
-## XPort Extension for VSCode
+# XPort Extension for VSCode
 
 "Cross" Port extension for VSCode.
 
@@ -8,7 +8,7 @@ This is an extension that runs along with a Port enabled namespace. Allowing the
 
 Please note that this is not a [LSP](https://langserver.org/) enabled extension. So will find nothing like intellisense for now. :(
 
-Requirements
+## Requirements
 
 * [__Visual Studio Code__](https://code.visualstudio.com/) obviously.
 
