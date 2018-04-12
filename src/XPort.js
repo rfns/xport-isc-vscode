@@ -5,7 +5,7 @@ const flatten = require('lodash.flatten');
 
 const XPortRequest = require('./XPortRequest');
 const WatcherController = require('./WatcherController');
-const CachedFiles = require('./CachedFiles');
+const FileCache = require('./FileCache');
 const FileEventQueue = require('./FileEventQueue');
 
 const { getPublishableFiles } = require('./lib/file');
@@ -16,7 +16,7 @@ const { IS_CACHE_FOLDERS } = require('./constants');
 
 class XPort {
   constructor(output) {
-    this.cache = new CachedFiles(output);
+    this.cache = new FileCache();
     this.watcherController = new WatcherController(output, this.globCacheFolders);
     this._saveQueue = new FileEventQueue({ context: this, handler: this._handleSaveEvent });
     this._deleteQueue = new FileEventQueue({ context: this, handler: this._handleDeleteEvent });
@@ -34,16 +34,16 @@ class XPort {
   _handleSaveEvent(events) {
     if (this._preventSaveEvent) return;
 
-    const projectFolders = uniq(events.map(e => {
+    const folders = uniq(events.map(e => {
       const folder = vscode.workspace.getWorkspaceFolder(e.uri || e);
       return folder ? folder.uri.fsPath : null;
     }).filter(e => !!e));
 
-    projectFolders.forEach(projectFolder => {
-      const projectName = getBasename(projectFolder);
-      const projectFileEvents = events.filter(event => (event.uri || event).fsPath.indexOf(projectFolder) > -1);
+    folders.forEach(folder => {
+      const folderName = getBasename(folder);
+      const folderFileEvents = events.filter(event => (event.uri || event).fsPath.indexOf(folder) > -1);
 
-      Promise.all(projectFileEvents.map(e => getPublishableFiles(e))).then(affectedFiles => {
+      Promise.all(folderFileEvents.map(e => getPublishableFiles(e))).then(affectedFiles => {
         const files = uniqBy(flatten(affectedFiles), file => file.path);
         // No need to call the API if there isn't any files.
         if (files.length === 0) return;
@@ -51,37 +51,38 @@ class XPort {
         // Neither if a new file has just been created.
         if (files.length === 1 && files[0].content.length === 0) return;
 
-        return this.cache.update(files.map(file => file.path)).then(() => {
-          return XPortRequest.create({ folder: projectFolder }).publish(files).then(({ oks, error }) => {
-            if (oks.length) display(`The following items were published to the server with success: \n\t${oks.join('\n\t')}.`, projectName);
+        return this.cache.update(files.map(file => file.path), { folderName }).then(() => {
+          return XPortRequest.create({ folder }).publish(files).then(({ oks, error }) => {
+            if (oks.length) display(`The following items were published to the server with success: \n\t${oks.join('\n\t')}.`, folderName);
             if (error) return Promise.reject(error);
           }).catch(error => {
-            display(`ERROR: ${error.message}`, projectName);
+            display(`ERROR: ${error.message}`, folderName);
             vscode.window.showErrorMessage(error.shortMessage, 'View output').then(choice => {
               if (choice === 'View output') return showOutput();
             });
           });
         });
       }).catch(err => {
-        display(`FATAL: ${err.message}`, projectName);
+        display(`FATAL: ${err.message}`, folderName);
       });
     });
   }
 
   _handleDeleteEvent(events) {
-    const projectsFolders = uniq(events.map(e => vscode.workspace.getWorkspaceFolder(e).uri.fsPath));
+    const workspceFolders = uniq(events.map(e => vscode.workspace.getWorkspaceFolder(e).uri.fsPath));
 
-    projectsFolders.forEach(projectFolder => {
-      const projectName = getBasename(projectFolder);
-      const projectFilePaths = events.filter(event => event.fsPath.indexOf(projectFolder) > -1).map(e => e.fsPath);
+    workspceFolders.forEach(workspaceFolder => {
+      const folderName = getBasename(workspaceFolder);
+      const projectFilePaths = events.filter(event => event.fsPath.indexOf(folderName) > -1).map(e => e.fsPath);
 
-      XPortRequest.create({ folder: projectFolder }).delete(projectFilePaths, this.cache._files).then(({ oks, error }) => {
-        if (oks.length) display(`The following items were DELETED: \n\t${oks.join('\n\t')}.`, projectName);
+      XPortRequest.create({ folder: workspaceFolder }).delete(projectFilePaths, this.cache.filesFrom(folderName)).then(({ oks, error }) => {
+        if (oks.length) display(`The following items were DELETED: \n\t${oks.join('\n\t')}.`, folderName);
         if (error) return Promise.reject(error);
       }).catch(error => {
-        display(`ERROR: ${error.message}`, projectName);
-        vscode.window.showErrorMessage(error.shortMessage);
-        return this.cache.update();
+        display(`ERROR: ${error.message}`, folderName);
+        vscode.window.showErrorMessage(error.shortMessage, 'View output').then(choice => {
+          if (choice === 'View output') return showOutput();
+        });
       });
     });
   }
@@ -105,14 +106,14 @@ class XPort {
       const target = e && e.fsPath;
 
       if (!folderName) {
-        return vscode.window.showErrorMessage('XPort: Cannot synchronize while no workspace folder is selected.');
+        return vscode.window.showErrorMessage('Cannot synchronize while no workspace folder is selected.');
       }
 
       // Don't let the command proceed if the target is not a valid Caché item.
       if (!target.match(IS_CACHE_FOLDERS)) return;
 
       return vscode.window.showWarningMessage(
-        'XPort: CAUTION: This action might overwrite modified files that weren\'t published to the server yet. Do you wish to proceed?',
+        'CAUTION: This action might overwrite modified files that weren\'t published to the server yet. Do you wish to proceed?',
         'YES', 'Cancel'
       ).then(choice => {
         if (choice !== 'YES') return;
@@ -122,14 +123,16 @@ class XPort {
 
         const items = [ e ? e.fsPath : '*' ];
 
-        XPortRequest.create({ folder: folderPath }).synchronize(items, this.cache._files).then(({ oks, error }) => {
+        XPortRequest.create({ folder: folderPath }).synchronize(items, this.cache.filesFrom(folderName)).then(({ oks, error }) => {
+          this._preventSaveEvent = false;
+
           if (oks.length) {
             display(`The following files were synchronized from the server: \n\t${oks.join('\n\t')}`, folderName);
             vscode.window.showInformationMessage(`XPort: ${oks.length + (oks.length > 1 ? ' files were' : ' file was')} synchronized from the server. Check the output for more details.`);
           }
 
           if (error) return Promise.reject(error);
-          this._preventSaveEvent = false;
+
         }).catch(error => {
           vscode.window.showErrorMessage(error.shortMessage);
           display(`ERROR: ${error.message}`);

@@ -1,29 +1,49 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-const vscode = require('vscode');
+const { workspace, window } = require('vscode');
 const XPort = require('./src/XPort');
 
-const { display } = require('./src/lib/output');
+const { display, output } = require('./src/lib/output');
 
-// this method is called when your extension is activated
-// your extension is activated the very first time the command is executed
 function activate(context) {
   display('Checking the workspace for a valid configuration ...', 'root');
 
-  let xportConfiguration = vscode.workspace.getConfiguration('xport');
+  let xportConfiguration = workspace.getConfiguration('xport');
   let xport = null;
 
-  context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(() => {
-    xportConfiguration = vscode.workspace.getConfiguration('xport');
+  context.subscriptions.push(workspace.onDidChangeConfiguration(() => {
+    xportConfiguration = workspace.getConfiguration('xport');
     setup(xportConfiguration);
   }));
 
-  context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
-    xport.cache.refresh();
+  context.subscriptions.push(workspace.onDidChangeWorkspaceFolders(e => {
+    // Do not attempt to use the cache because its instance is created along with the XPort.
+    if (!xport) return;
+
+    if (e.added.length) {
+      display(`${e.added.length} folder(s) were added to the workspace.`, 'root');
+      Promise.all(
+        e.added.map(addedWorkspaceFolder =>
+          xport.cache.build({ force: true, folder: addedWorkspaceFolder.uri.fsPath }).then(files => {
+            display(`Cached ${files.length} file(s) from '${addedWorkspaceFolder.name}'.`, 'root');
+          })
+        )
+      );
+    }
+    if (e.removed.length) {
+      display(`${e.removed.length} folder(s) were removed from the workspace.`, 'root');
+      Promise.all(
+        e.removed.map(removedWorkspaceFolder => {
+          const count = xport.cache.purge(removedWorkspaceFolder.name);
+          display(`${count} file(s) that belonged to '${removedWorkspaceFolder.name}' were purged from the cache.`, 'root');
+        })
+      )
+    }
   }));
 
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => {
-    xport.cache.refresh();
+  context.subscriptions.push(window.onDidChangeActiveTextEditor(e => {
+    // File might be opened, but if no configuration is found, then no XPort instance should be available as well.
+    if (!xport || e.document.uri.schema !== 'file') return;
+!
+    xport.cache.update([e.document.uri.fsPath], { skipPathExistsCheck: true });
   }));
 
   const setup = settings => {
@@ -33,15 +53,29 @@ function activate(context) {
     }
 
     if (!xport) {
-      display(`Configuration found! The workspace '${vscode.workspace.name}' is integrated to the server.`, 'root');
+      display(`Configuration found! The workspace '${workspace.name}' is integrated to the server.`, 'root');
       xport = new XPort();
 
-      context.subscriptions.push(vscode.workspace.onDidSaveTextDocument(e => xport.addToSaveQueue(e)));
+      context.subscriptions.push(workspace.onDidSaveTextDocument(e => xport.addToSaveQueue(e)));
       context.subscriptions.push(xport.createSyncCommand());
       // context.subscriptions.push(xport.createRemoveAndDeleteCommand());
       context.subscriptions.push(xport.createWatcherOnDeleteFile());
       context.subscriptions.push(xport.createWatcherOnNewFile());
-      return xport.cache.refresh();
+      context.subscriptions.push(output);
+
+      // This also includes newly added folders that couldn't be cached due to the XPort instance not being available.
+      if (workspace.workspaceFolders && workspace.workspaceFolders.length) {
+        display(`Found ${workspace.workspaceFolders.length} folder(s) in this workspace.`, 'root');
+        Promise.all(
+          workspace.workspaceFolders.map(
+            workspaceItem => {
+              xport.cache.build({ folder: workspaceItem.uri.fsPath }).then(files => {
+                display(`Cached ${files.length} file(s) from '${workspaceItem.name}'.`, 'root');
+              });
+            }
+          )
+        );
+      }
     }
   }
   setup(xportConfiguration);

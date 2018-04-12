@@ -18,8 +18,7 @@ const {
   CouldNotPublishItemsError,
   CouldNotWriteFilesError,
   CouldNotDeleteItemsError,
-  CouldNotRemoveItemsError,
-  HttpRequestError
+  CouldNotRemoveItemsError
 } = require('./errors');
 
 class XPortRequest {

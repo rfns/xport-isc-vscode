@@ -23,7 +23,7 @@ module.exports = class FileEventQueue {
       try {
         this._handler(this._events);
       } catch (err) {
-        display(`FATAL: ${err.message}`)
+        display(`FATAL: ${err.message}`);
       } finally {
         this._ensureNoPendingTimeout();
         this._events = [];

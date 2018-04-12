@@ -9,4 +9,4 @@ const display = (message, folder = currentFolderName) =>
 
 const showOutput = (preserveFocus) => output.show(preserveFocus);
 
-module.exports = { display, showOutput };
+module.exports = { display, showOutput, output };
