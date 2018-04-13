@@ -1,4 +1,4 @@
-const vscode = require('vscode');
+const { workspace } = require('vscode');
 
 const { GLOB_CACHE_FOLDERS } = require('./constants');
 
@@ -45,14 +45,14 @@ module.exports = class WatcherController {
     this.dispose('onDidCreate');
     this._handlers.set('onDidCreate', handler);
 
-    const watcher = vscode.workspace.createFileSystemWatcher(
+    const watcher = workspace.createFileSystemWatcher(
       `**/**/${GLOB_CACHE_FOLDERS}`,
       false,
       true,
       true
     );
 
-    const watcherRoot = vscode.workspace.createFileSystemWatcher(
+    const watcherRoot = workspace.createFileSystemWatcher(
       `**/**/${GLOB_CACHE_FOLDERS.split('/').pop()}`,
       false,
       true,
@@ -70,14 +70,14 @@ module.exports = class WatcherController {
     this.dispose('onDidDelete');
     this._handlers.set('onDidDelete', handler);
 
-    const watcher = vscode.workspace.createFileSystemWatcher(
+    const watcher = workspace.createFileSystemWatcher(
       `**/${GLOB_CACHE_FOLDERS}`,
       true,
       true,
       false
     );
 
-    const watcherRoot = vscode.workspace.createFileSystemWatcher(
+    const watcherRoot = workspace.createFileSystemWatcher(
       `**/${GLOB_CACHE_FOLDERS.split('/').pop()}`,
       true,
       true,

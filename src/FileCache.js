@@ -25,7 +25,9 @@ class FileCache {
   }
 
   build({ folder = getCurrentFolder(), force = false } = {}) {
-    if (force || this.files.length === 0) {
+    const folderName = getBasename(folder);
+
+    if (force || getFilesFromNamedCache(this._cache, folderName).length === 0) {
       return workspace.findFiles(
         new RelativePattern(folder, `${GLOB_CACHE_FOLDERS}`)
       ).then(files => {
