@@ -2,7 +2,7 @@ const { workspace } = require('vscode');
 
 const { GLOB_CACHE_FOLDERS } = require('./constants');
 
-module.exports = class WatcherController {
+module.exports = class FileSystemWatcher {
   constructor() {
     this._disposables = new Map();
     this._handlers = new Map();
@@ -24,21 +24,6 @@ module.exports = class WatcherController {
       return true;
     }
     return false;
-  }
-
-  restore(key) {
-    if (!key) {
-      this.restore('onDidCreate');
-      return this.restore('onDidDelete');
-    }
-
-    let handler = this.getHandler(key);
-    let restoredWatcher = null;
-
-    if (handler !== key && this[key]) {
-      restoredWatcher = this[key](handler);
-    }
-    return restoredWatcher;
   }
 
   onDidCreate(handler) {

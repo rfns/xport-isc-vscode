@@ -3,7 +3,7 @@ const { display } = require('./lib/output');
 const wrapHandler = finalHandler => events => finalHandler(events);
 
 module.exports = class FileEventQueue {
-  constructor({ context, handler, ticks = 300 }) {
+  constructor({ context, handler, ticks = 50 }) {
     this._events = [];
     this._timeout = null;
     this._ticks = ticks;

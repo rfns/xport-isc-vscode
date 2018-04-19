@@ -1,9 +1,10 @@
 const { workspace, window } = require('vscode');
-const XPort = require('./src/XPort');
-
-const { display, output } = require('./src/lib/output');
 
 function activate(context) {
+  // Prevents extension from running if the activation criteria doesn't match.
+  const { display, output } = require('./src/lib/output');
+  const XPort = require('./src/XPort');
+
   display('Checking the workspace for a valid configuration ...', 'root');
 
   let xportConfiguration = workspace.getConfiguration('xport');
@@ -83,6 +84,6 @@ function activate(context) {
 
 exports.activate = activate;
 
-// this method is called when your extension is deactivated
+// Nothing for now...
 function deactivate() {}
 exports.deactivate = deactivate;

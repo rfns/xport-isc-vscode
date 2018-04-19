@@ -11,7 +11,7 @@ const prepareOptionsAndPayload = (method, requestHeaders, body) => Object.assign
   })
 });
 
-const fetchJSON = (url, data) => fetch(url, data).then(response => {
+const fetchJSON = async (url, data) => fetch(url, data).then(response => {
   return Promise.all([ response.status, response.json() ])
 }).then(data => {
   let [ status, response ] = data;

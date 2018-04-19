@@ -1,10 +1,15 @@
 const { window, workspace } = require('vscode');
 const { basename } = require('path');
 
+const { IS_CACHE_FOLDERS } = require('../constants');
+
 const getBasename = (folderPath = '') => basename(folderPath);
 
 const findPathFromAvailableFolders = () => {
+  if (!workspace.workspaceFolders) return;
+
   const folder = workspace.workspaceFolders.filter(workspaceItem => workspace.name === workspaceItem.name).pop();
+
   if (folder) return folder.uri.fsPath;
   return;
 };
@@ -34,10 +39,13 @@ const getCurrentFolder = () => {
   return findPathFromAvailableFolders();
 }
 
+const makeTypeRegexForWorkspaceFolder = workspaceFolder => new RegExp(`${workspaceFolder}${IS_CACHE_FOLDERS.source}`);
+
 module.exports = {
   getCurrentFolder,
   getBasename,
-  getFolder
+  getFolder,
+  makeTypeRegexForWorkspaceFolder
 };
 
 

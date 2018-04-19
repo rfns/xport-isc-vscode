@@ -46,13 +46,13 @@ class XPortRequest {
       return Promise.resolve([]);
     }
 
-    return window.withProgress({ location: 10, title: 'XPort: Publishing files ...' }, progress => {
+    return window.withProgress({ location: 15, title: `XPort (${this.projectName}): Publishing ${filePayload.length} files(s) ...` }, progress => {
       return fetchJSON(url, prepareOptionsAndPayload('POST', this._headers, {
         files: filePayload
       })).then(({ oks, errors, warning }) => {
         if (warning) window.showWarningMessage(warning);
 
-        progress.report({ message: 'XPort: Patching file with the received data ...' });
+        progress.report({ message: `XPort (${this.projectName}): Rewritting compiled files ...` });
         return writeFiles(oks).then(files => {
           let [ filesWritten, filesNotWritten ] = files;
 
@@ -74,28 +74,25 @@ class XPortRequest {
     });
   }
 
-  delete(filePaths = [], cachedFiles) {
+  async delete(filePaths = [], cachedFiles) {
     const url = `${this.server}/api/xport/${this.namespace}/${this.projectName}/items/delete`;
-    const items = uniq(flatten(filePaths.map(path => getMatchingPaths(path, cachedFiles))));
+    const items = uniq(flatten(filePaths.map(path => getMatchingPaths(path, cachedFiles))));    
 
-    return window.withProgress({ location: 10, title: 'XPort: Requesting items deletion ...' }, () => {
-      return fetchJSON(url, prepareOptionsAndPayload('POST', this._headers, {
-        items
-      })).then(({ oks, errors }) => {
-        if (errors.length) {
-          return {
-            oks,
-            error: new CouldNotDeleteItemsError(errors)
-          };
-        }
-        return { oks };
-      });
+    return window.withProgress({ location: 15, title: `XPort (${this.projectName}): Send request to delete ${items.length} files ...` }, async () => {
+      const {oks, errors } = await fetchJSON(url, prepareOptionsAndPayload('POST', this._headers, { items }));
+      if (errors.length) {
+        return {
+          oks,
+          error: new CouldNotDeleteItemsError(errors)
+        };
+      }
+      return { oks };
     });
   }
 
-  remove(filePath, files) {
-    let url = `${this.server}/api/xport/${this.namespace}/${this.projectName}/items/remove`;
-    let items = [ filePath ];
+  async remove(filePath, files) {
+    const url = `${this.server}/api/xport/${this.namespace}/${this.projectName}/items/remove`;
+    const items = [ filePath ];
 
     if (!files.includes(filePath)) {
       items = getMatchingPaths(filePath, files);
@@ -103,52 +100,51 @@ class XPortRequest {
 
     return window.withProgress({
       location: 10,
-      title: 'XPort: Requesting items removal ...'
-    }, () => {
-      return fetchJSON(url, prepareOptionsAndPayload('POST', this._headers, {
-        items
-      })).then(data => {
-        if (data.error_on_remove.length) {
-          return {
-            success: data.success_on_remove,
-            error: new CouldNotRemoveItemsError(data.error_on_remove)
-          };
-        }
-        return { success: data.success_on_remove };
-      });
+      title: 'Requesting items removal ...'
+    }, async () => {
+      const { oks, errors } = fetchJSON(url, prepareOptionsAndPayload('POST', this._headers, { items }));
+
+      if (errors.length) {
+        return {
+          oks,
+          error: new CouldNotRemoveItemsError(errors)
+        };
+      }
+      return { oks };
     });
   }
 
-  synchronize(items = [], cachedFiles) {
+  async synchronize(items = [], cachedFiles) {
     let url = `${this.server}/api/xport/${this.namespace}/${this.projectName}/items/fetch`;
 
-    items = uniq(flatten(items.map(path => getMatchingPaths(path, cachedFiles))));
+    if (!(items.length === 1 && items[0] === '*')) {      
+      items = uniq(flatten(items.map(path => getMatchingPaths(path, cachedFiles))));
+    }
 
-    return window.withProgress({ location: 10, title: 'XPort: Fetching file contents from the server ...' }, (progress) => {
-      return fetchJSON(url, prepareOptionsAndPayload('POST', this._headers, {
+    return window.withProgress({ location: 15, title: `XPort (${this.projectName}): Fetching sources from the server ...` }, async (progress) => {
+      const { oks, errors } = await fetchJSON(url, prepareOptionsAndPayload('POST', this._headers, {
         items,
         workspace: this.folder
-      })).then(({ oks, errors }) => {
-        progress.report({ message: 'XPort: Creating required paths ...' });
-        return ensurePathExists(oks).then(files => ({ files, errors }));
-      }).then(({ files, errors }) => {
-        progress.report({ message: 'XPort: Writing files ...' });
-        return writeFiles(files).then(files => {
-          let [ filesWritten, filesNotWritten ] = files;
+      }));
 
-          if (filesNotWritten.length) {
-            filesNotWritten = filesNotWritten.map(fileNotWritten => { error: fileNotWritten })
-          }
+      progress.report({ message: `XPort (${this.projectName})$): Mirroring paths ...` });
 
-          if (filesNotWritten.length || errors.length) {
-            return {
-              oks: filesWritten,
-              error: new CouldNotWriteFilesError([ ...errors, ...filesNotWritten ])
-            };
-          }
-          return { oks: filesWritten };
-        });
-      });
+      await ensurePathExists(oks);
+
+      progress.report({ message: `XPort (${this.projectName}): Writing files ...` });
+      const [ filesWritten, filesNotWritten ] = await writeFiles(oks);
+
+      if (filesNotWritten.length) {
+        filesNotWritten = filesNotWritten.map(fileNotWritten => { error: fileNotWritten })
+      }
+
+      if (filesNotWritten.length || errors.length) {
+        return {
+          oks: filesWritten,
+          error: new CouldNotWriteFilesError([ ...errors, ...filesNotWritten ])
+        };
+      }
+      return { oks: filesWritten };
     });
   }
 

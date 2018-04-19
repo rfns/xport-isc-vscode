@@ -4,12 +4,12 @@ const uniq = require('lodash.uniq');
 const flatten = require('lodash.flatten');
 
 const XPortRequest = require('./XPortRequest');
-const WatcherController = require('./WatcherController');
+const FileSystemWatcher = require('./FileSystemWatcher');
 const FileCache = require('./FileCache');
 const FileEventQueue = require('./FileEventQueue');
 
 const { getPublishableFiles } = require('./lib/file');
-const { getBasename, getFolder } = require('./lib/workspace');
+const { getBasename, getFolder, makeTypeRegexForWorkspaceFolder } = require('./lib/workspace');
 const { display, showOutput } = require('./lib/output');
 
 const { IS_CACHE_FOLDERS } = require('./constants');
@@ -17,17 +17,22 @@ const { IS_CACHE_FOLDERS } = require('./constants');
 class XPort {
   constructor(output) {
     this.cache = new FileCache();
-    this.watcherController = new WatcherController(output, this.globCacheFolders);
+    this._fsw = new FileSystemWatcher(output, this.globCacheFolders);
     this._saveQueue = new FileEventQueue({ context: this, handler: this._handleSaveEvent });
     this._deleteQueue = new FileEventQueue({ context: this, handler: this._handleDeleteEvent });
     this._preventSaveEvent = false;
   }
 
   addToSaveQueue(e) {
+    const uri = e.uri || e;
+    const workspaceFolderRegex = makeTypeRegexForWorkspaceFolder(getBasename(getFolder(uri)));
+    if (!workspaceFolderRegex.test(uri.fsPath)) return;
     this._saveQueue.add(e);
   }
 
   addToDeleteQueue(e) {
+    const workspaceFolderRegex = makeTypeRegexForWorkspaceFolder(getBasename(getFolder(e)));
+    if (!workspaceFolderRegex.test(e.fsPath)) return;
     this._deleteQueue.add(e);
   }
 
@@ -88,29 +93,35 @@ class XPort {
   }
 
   createWatcherOnNewFile() {
-    this.watcherController.onDidCreate(e => this.addToSaveQueue(e));
-    return { dispose: () => this.watcherController.dispose('onDidCreate') };
+    this._fsw.onDidCreate(e => this.addToSaveQueue(e));
+    return { dispose: () => this._fsw.dispose('onDidCreate') };
   }
 
   createWatcherOnDeleteFile() {
-    this.watcherController.onDidDelete(e => this.addToDeleteQueue(e));
-    return { dispose: () => this.watcherController.dispose('onDidDelete') };
+    this._fsw.onDidDelete(e => this.addToDeleteQueue(e));
+    return { dispose: () => this._fsw.dispose('onDidDelete') };
   }
 
   createSyncCommand() {
     return vscode.commands.registerCommand('xport.forceServerSync', e => {
-      this._preventSaveEvent = true;
-
       const folderPath = getFolder(e);
       const folderName = getBasename(folderPath);
       const target = e && e.fsPath;
 
+      let items = [];
+
       if (!folderName) {
-        return vscode.window.showErrorMessage('Cannot synchronize while no workspace folder is selected.');
+        return vscode.window.showErrorMessage('Cannot synchronize while there\'s no workspace folder selected.');
       }
 
       // Don't let the command proceed if the target is not a valid Caché item.
-      if (!target.match(IS_CACHE_FOLDERS)) return;
+      if (target !== folderPath) {
+        if (!target.match(IS_CACHE_FOLDERS)) return;
+
+        items = [ e ? e.fsPath : '*' ];
+      } else {
+        items = ['*'];
+      }
 
       return vscode.window.showWarningMessage(
         'CAUTION: This action might overwrite modified files that weren\'t published to the server yet. Do you wish to proceed?',
@@ -121,14 +132,12 @@ class XPort {
         // Stops the _handleSaveEvent from calling the request API.
         this._preventSaveEvent = true;
 
-        const items = [ e ? e.fsPath : '*' ];
-
         XPortRequest.create({ folder: folderPath }).synchronize(items, this.cache.filesFrom(folderName)).then(({ oks, error }) => {
           this._preventSaveEvent = false;
 
           if (oks.length) {
-            display(`The following files were synchronized from the server: \n\t${oks.join('\n\t')}`, folderName);
-            vscode.window.showInformationMessage(`XPort: ${oks.length + (oks.length > 1 ? ' files were' : ' file was')} synchronized from the server. Check the output for more details.`);
+            display(`The following files were synchronized with the server: \n\t${oks.join('\n\t')}`, folderName);
+            vscode.window.showInformationMessage(`${oks.length + (oks.length > 1 ? ' files were' : ' file was')} synchronized with the server. Check the output for more details.`);
           }
 
           if (error) return Promise.reject(error);

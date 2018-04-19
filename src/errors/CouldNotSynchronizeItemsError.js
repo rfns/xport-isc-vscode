@@ -5,7 +5,7 @@ module.exports = class CouldNotSynchronizeItemsError extends Error {
         `${item.name} (Reason: ${item.reason}.)`
       )}
     `);
-    this.shortMessage = 'XPort: Could not synchronize all the requested items. Check your Output for more details';
+    this.shortMessage = 'Could not synchronize all the requested items. Check your Output for more details';
     this.items = items;
   }
 };

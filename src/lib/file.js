@@ -1,6 +1,6 @@
 const glob = require('glob-promise');
 const { readFile, lstat, mkdirp, writeFile } = require('fs-extra');
-const { normalize } = require('path');
+const { normalize, dirname } = require('path');
 
 const { CRLF, IS_CACHE_FOLDERS } = require('../constants');
 
@@ -53,6 +53,12 @@ const writeFiles = files => {
 
   return Promise.all(
     files.map(file => {
+      // Don't care about what map returns, it's needed only to wait all writes to be finished.
+      if (!file.content.length) {
+        filesWritten.push(file.path);
+        return;
+      }
+
       return writeFile(file.path, file.content.join(CRLF)).then(() => {
         filesWritten.push(file.path);
       }).catch(err => {
@@ -66,7 +72,7 @@ const writeFiles = files => {
 
 const ensurePathExists = sources => {
   return Promise.all(sources.map(source => {
-    return mkdirp(source.directory).then(() =>  {
+    return mkdirp(dirname(source.path)).then(() =>  {
       let { path, file_name, content } = source;
       return {
         path,

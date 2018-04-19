@@ -2,7 +2,7 @@
   "name": "xport-cache-vscode",
   "displayName": "XPort",
   "description": "An add-on for Port that provides a RESTful API for managing projects using VSCode.",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "publisher": "rubens",
   "engines": {
     "vscode": "^1.17.0"
@@ -21,28 +21,23 @@
       "properties": {
         "xport.remote.server": {
           "type": "string",
-          "default": "http://localhost:57772",
-          "description": "The address where the source code API is hosted"
+          "description": "The host address hosting the XPort API",
+          "default": "http://localhost:57772"
         },
         "xport.remote.namespace": {
           "type": "string",
-          "default": "USER",
-          "description": "The namespace where the source code web application was created"
-        },
-        "xport.remote.includeStack": {
-          "type": "string",
-          "default": false,
-          "description": "Enable this include the stack string from when an operation fails."
+          "description": "The namespace that contains the source code",
+          "default": "USER"
         },
         "xport.authentication.username": {
           "type": "string",
-          "default": "_system",
-          "description": "The user name that should be used to authenticate. This user must have %Development function or %Developer role."
+          "description": "The user name that should be used to authenticate. This user must have %Development function or %Developer role.",
+          "default": "_system"
         },
         "xport.authentication.password": {
           "type": "string",
-          "default": "SYS",
-          "description": "The user password that should be used to authenticate."
+          "description": "The user password that should be used to authenticate.",
+          "default": "SYS"
         },
         "xport.requestHeaders": {
           "type": "object",
@@ -94,8 +89,6 @@
     "lodash.uniq": "^4.5.0",
     "lodash.uniqby": "^4.7.0",
     "lodash.without": "^4.4.0",
-    "minimatch": "^3.0.4",
-    "p-queue": "^2.4.0",
     "whatwg-fetch": "^2.0.3"
   }
 }
